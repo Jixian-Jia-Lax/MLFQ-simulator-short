@@ -12,10 +12,11 @@ struct Process {
     int ioFrequency;
     int remainingTime;
     int priorityLevel;
+    int remainingAllotment;
 
     Process(int id, int startTime, int runTime, int ioFrequency, int priorityLevel)
-        : id(id), startTime(startTime), runTime(runTime), ioFrequency(ioFrequency),
-          remainingTime(runTime), priorityLevel(priorityLevel) {}
+            : id(id), startTime(startTime), runTime(runTime), ioFrequency(ioFrequency),
+              remainingTime(runTime), priorityLevel(priorityLevel),remainingAllotment(5){}
 };
 
 // MLFQ Scheduler class
@@ -38,7 +39,7 @@ private:
     bool allQueuesEmpty();
 
     // Helper function to move processes between queues
-    void moveProcess(Process process);
+    void reduceProcessPriority(Process process);
 };
 
 MLFQScheduler::MLFQScheduler(int numLevels) : numLevels(numLevels), currentTime(0) {
@@ -58,14 +59,15 @@ bool MLFQScheduler::allQueuesEmpty() {
     return true;
 }
 
-void MLFQScheduler::moveProcess(Process process) {
+void MLFQScheduler::reduceProcessPriority(Process process) {
     process.priorityLevel = min(process.priorityLevel + 1, numLevels - 1);
+    process.remainingAllotment = 5;
     queues[process.priorityLevel].push(process);
 }
 
 void MLFQScheduler::run() {
     cout << "Simulation Log:" << endl;
-    
+
     while (!allQueuesEmpty()) {
         for (int i = 0; i < numLevels; ++i) {
             if (!queues[i].empty()) {
@@ -74,16 +76,23 @@ void MLFQScheduler::run() {
                     cout << "Time " << currentTime << ": Running Process " << currentProcess.id
                          << " (Priority " << currentProcess.priorityLevel << ")" << endl;
                     currentProcess.remainingTime--;
+                    currentProcess.remainingAllotment--;
 
                     if (currentProcess.remainingTime == 0) {
                         queues[i].pop();
-                    } else {
-                        moveProcess(currentProcess);
+                    } else if(currentProcess.remainingAllotment == 0){
+                        queues[i].pop();
+                        reduceProcessPriority(currentProcess);
+                    }
+                    else{
+                        queues[i].pop();
+                        queues[i].push(currentProcess);
                     }
 
                     currentTime++;
                 } else {
-                    currentTime++;
+                    queues[i].pop();
+                    queues[i].push(currentProcess);
                 }
             }
         }
@@ -91,7 +100,12 @@ void MLFQScheduler::run() {
 }
 
 int main() {
-    int numLevels = 3;
+    int numLevels;
+    cout << "Enter the number of levels: ";
+    cin >> numLevels;
+
+
+
     MLFQScheduler scheduler(numLevels);
 
     int numJobs;
