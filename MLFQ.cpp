@@ -9,20 +9,20 @@ struct Process {
     int id;
     int startTime;
     int runTime;
-    int ioFrequency;
+
     int remainingTime;
     int priorityLevel;
     int remainingAllotment;
 
-    Process(int id, int startTime, int runTime, int ioFrequency, int priorityLevel)
-            : id(id), startTime(startTime), runTime(runTime), ioFrequency(ioFrequency),
-              remainingTime(runTime), priorityLevel(priorityLevel),remainingAllotment(5){}
+    Process(int id, int startTime, int runTime, int priorityLevel, int remainingAllotment)
+            : id(id), startTime(startTime), runTime(runTime),
+              remainingTime(runTime), priorityLevel(priorityLevel),remainingAllotment(remainingAllotment){}
 };
 
 // MLFQ Scheduler class
 class MLFQScheduler {
 public:
-    MLFQScheduler(int numLevels);
+    MLFQScheduler(int numLevels, vector<int> quantums, vector<int> allotments);
 
     // Add a process to the scheduler
     void addProcess(Process process);
@@ -31,6 +31,8 @@ public:
     void run();
 
 private:
+    vector<int> quantums;
+    vector<int> allotments;
     int numLevels;
     vector<queue<Process> > queues;
     int currentTime;
@@ -42,7 +44,7 @@ private:
     void reduceProcessPriority(Process process);
 };
 
-MLFQScheduler::MLFQScheduler(int numLevels) : numLevels(numLevels), currentTime(0) {
+MLFQScheduler::MLFQScheduler(int numLevels, vector<int> quantums, vector<int> allotments) : numLevels(numLevels), currentTime(0),quantums(quantums),allotments(allotments) {
     queues.resize(numLevels);
 }
 
@@ -61,7 +63,7 @@ bool MLFQScheduler::allQueuesEmpty() {
 
 void MLFQScheduler::reduceProcessPriority(Process process) {
     process.priorityLevel = min(process.priorityLevel + 1, numLevels - 1);
-    process.remainingAllotment = 5;
+    process.remainingAllotment = allotments[process.priorityLevel];
     queues[process.priorityLevel].push(process);
 }
 
@@ -75,12 +77,12 @@ void MLFQScheduler::run() {
                 if (currentProcess.startTime <= currentTime) {
                     cout << "Time " << currentTime << ": Running Process " << currentProcess.id
                          << " (Priority " << currentProcess.priorityLevel << ")" << endl;
-                    currentProcess.remainingTime--;
-                    currentProcess.remainingAllotment--;
+                    currentProcess.remainingTime -= quantums[currentProcess.priorityLevel];
+                    currentProcess.remainingAllotment-= quantums[currentProcess.priorityLevel];
 
-                    if (currentProcess.remainingTime == 0) {
+                    if (currentProcess.remainingTime <= 0) {
                         queues[i].pop();
-                    } else if(currentProcess.remainingAllotment == 0){
+                    } else if(currentProcess.remainingAllotment <= 0){
                         queues[i].pop();
                         reduceProcessPriority(currentProcess);
                     }
@@ -89,7 +91,7 @@ void MLFQScheduler::run() {
                         queues[i].push(currentProcess);
                     }
 
-                    currentTime++;
+                    currentTime+= quantums[currentProcess.priorityLevel];
                 } else {
                     queues[i].pop();
                     queues[i].push(currentProcess);
@@ -104,9 +106,20 @@ int main() {
     cout << "Enter the number of levels: ";
     cin >> numLevels;
 
+    vector<int> quantums;
+    vector<int> allotments;
+
+    quantums.resize(numLevels);
+    allotments.resize((numLevels));
+    for(int i =0; i< numLevels; ++i){
+        cout << "Enter the quantum of queue " << i;
+        cin >> quantums[i];
+        cout << "Enter the allotment of queue " << i;
+        cin >> allotments[i];
+    }
 
 
-    MLFQScheduler scheduler(numLevels);
+    MLFQScheduler scheduler(numLevels, quantums, allotments);
 
     int numJobs;
     cout << "Enter the number of jobs: ";
@@ -119,9 +132,8 @@ int main() {
         cin >> startTime;
         cout << "Run Time: ";
         cin >> runTime;
-        cout << "IO Frequency: ";
-        cin >> ioFrequency;
-        scheduler.addProcess(Process(i, startTime, runTime, ioFrequency, 0));
+
+        scheduler.addProcess(Process(i, startTime, runTime, 0,allotments[0]));
     }
 
     // Run the MLFQ scheduler and display logs
